@@ -1,0 +1,16 @@
+package com.gymapp.mealplan;
+
+import java.util.List;
+import java.util.Optional;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+public interface MealPlanRepository extends JpaRepository<MealPlan, Long> {
+
+    List<MealPlan> findByUserIdOrderByCreatedAtDesc(Long userId);
+
+    List<MealPlan> findByTemplateTrue();
+
+    Optional<MealPlan> findByIdAndTemplateTrue(Long id);
+
+    Optional<MealPlan> findByIdAndUserId(Long id, Long userId);
+}

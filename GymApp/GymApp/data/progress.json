@@ -1,0 +1,48 @@
+{
+  "start_date": null,
+  "current_day": 1,
+  "day_logs": {
+    "1": {
+      "completed": false,
+      "sets": {
+        "0": [],
+        "1": [],
+        "2": [],
+        "3": [],
+        "4": [],
+        "5": []
+      },
+      "notes": ""
+    },
+    "2": {
+      "completed": false,
+      "sets": {
+        "0": [],
+        "1": [],
+        "2": [],
+        "3": [],
+        "4": [],
+        "5": []
+      },
+      "notes": ""
+    },
+    "3": {
+      "completed": false,
+      "sets": {},
+      "notes": ""
+    },
+    "4": {
+      "completed": false,
+      "sets": {
+        "0": [],
+        "1": [],
+        "2": [],
+        "3": [],
+        "4": []
+      },
+      "notes": ""
+    }
+  },
+  "weekly_logs": {},
+  "custom_workouts": {}
+}

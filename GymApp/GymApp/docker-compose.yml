@@ -1,0 +1,5 @@
+services:
+  gymapp:
+    build: .
+    image: gymapp:latest
+    container_name: gymapp

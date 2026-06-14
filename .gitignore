@@ -26,6 +26,11 @@ GymApp.zip
 # Local tools / downloads
 tools/
 
+# Runtime logs
+*-run.log
+backend/backend-run.log
+frontend/frontend-run.log
+
 # OS / IDE
 .DS_Store
 Thumbs.db

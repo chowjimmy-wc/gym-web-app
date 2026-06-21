@@ -2,9 +2,13 @@ package com.gymapp.progress;
 
 import com.gymapp.common.ApiException;
 import com.gymapp.program.ProgramService;
+import com.gymapp.program.WorkoutExercise;
+import com.gymapp.program.WorkoutExerciseRepository;
 import com.gymapp.program.WorkoutProgram;
 import com.gymapp.progress.ProgressDtos.DayLogDto;
 import com.gymapp.progress.ProgressDtos.DayLogRequest;
+import com.gymapp.progress.ProgressDtos.ExerciseLogDto;
+import com.gymapp.progress.ProgressDtos.ExerciseLogRequest;
 import com.gymapp.progress.ProgressDtos.WeeklyReviewDto;
 import com.gymapp.progress.ProgressDtos.WeeklyReviewRequest;
 import com.gymapp.user.User;
@@ -21,6 +25,8 @@ public class ProgressService {
     private final ProgramService programService;
     private final DayLogRepository dayLogRepository;
     private final WeeklyReviewRepository weeklyReviewRepository;
+    private final ExerciseLogRepository exerciseLogRepository;
+    private final WorkoutExerciseRepository workoutExerciseRepository;
 
     public List<DayLogDto> listDayLogs(User user, Long programId) {
         programService.findOwned(user, programId);
@@ -56,6 +62,32 @@ public class ProgressService {
             log.setWorkoutNotes(request.workoutNotes());
         }
         return ProgressDtos.toDto(dayLogRepository.save(log));
+    }
+
+    public List<ExerciseLogDto> listExerciseLogs(User user, Long programId) {
+        programService.findOwned(user, programId);
+        return exerciseLogRepository.findByProgramId(programId).stream()
+                .map(ProgressDtos::toDto)
+                .toList();
+    }
+
+    @Transactional
+    public ExerciseLogDto upsertExerciseLog(
+            User user, Long programId, Long exerciseId, ExerciseLogRequest request) {
+        programService.findOwned(user, programId);
+        WorkoutExercise exercise = workoutExerciseRepository.findById(exerciseId)
+                .filter(e -> e.getDay().getProgram().getId().equals(programId))
+                .orElseThrow(() -> ApiException.notFound("找不到此動作"));
+        ExerciseLog log = exerciseLogRepository.findByExerciseId(exerciseId)
+                .orElseGet(() -> {
+                    ExerciseLog l = new ExerciseLog();
+                    l.setExercise(exercise);
+                    return l;
+                });
+        boolean completed = request.completed() != null && request.completed();
+        log.setCompleted(completed);
+        log.setCompletedAt(completed ? Instant.now() : null);
+        return ProgressDtos.toDto(exerciseLogRepository.save(log));
     }
 
     public List<WeeklyReviewDto> listWeeklyReviews(User user, Long programId) {

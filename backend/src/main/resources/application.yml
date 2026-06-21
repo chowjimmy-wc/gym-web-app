@@ -12,9 +12,15 @@ spring:
   flyway:
     enabled: true
     locations: classpath:db/migration
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 12MB
 
 server:
-  port: ${SERVER_PORT:8080}
+  # Local default is 8090 because 8080 is commonly occupied on the dev machine.
+  # In Docker, docker-compose sets SERVER_PORT=8080 to match the container port mapping.
+  port: ${SERVER_PORT:8090}
 
 app:
   jwt:

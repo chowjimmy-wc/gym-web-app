@@ -2,6 +2,8 @@ package com.gymapp.progress;
 
 import com.gymapp.progress.ProgressDtos.DayLogDto;
 import com.gymapp.progress.ProgressDtos.DayLogRequest;
+import com.gymapp.progress.ProgressDtos.ExerciseLogDto;
+import com.gymapp.progress.ProgressDtos.ExerciseLogRequest;
 import com.gymapp.progress.ProgressDtos.WeeklyReviewDto;
 import com.gymapp.progress.ProgressDtos.WeeklyReviewRequest;
 import com.gymapp.user.User;
@@ -39,6 +41,21 @@ public class ProgressController {
             @PathVariable int dayNumber,
             @Valid @RequestBody DayLogRequest request) {
         return progressService.upsertDayLog(user, programId, dayNumber, request);
+    }
+
+    @GetMapping("/exercise-logs")
+    public List<ExerciseLogDto> listExerciseLogs(
+            @AuthenticationPrincipal User user, @PathVariable Long programId) {
+        return progressService.listExerciseLogs(user, programId);
+    }
+
+    @PutMapping("/exercise-logs/{exerciseId}")
+    public ExerciseLogDto upsertExerciseLog(
+            @AuthenticationPrincipal User user,
+            @PathVariable Long programId,
+            @PathVariable Long exerciseId,
+            @RequestBody ExerciseLogRequest request) {
+        return progressService.upsertExerciseLog(user, programId, exerciseId, request);
     }
 
     @GetMapping("/weekly-reviews")

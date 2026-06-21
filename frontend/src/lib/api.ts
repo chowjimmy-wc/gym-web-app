@@ -1,6 +1,6 @@
 import type { UserInfo } from "./types";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8090";
 
 const TOKEN_KEY = "gymapp_token";
 const USER_KEY = "gymapp_user";
@@ -78,4 +78,62 @@ export async function api<T>(path: string, options: RequestOptions = {}): Promis
 
   if (response.status === 204) return undefined as T;
   return (await response.json()) as T;
+}
+
+/** Uploads a file via multipart/form-data and returns the parsed JSON response. */
+export async function apiUpload<T>(
+  path: string,
+  file: File,
+  query: Record<string, string> = {},
+): Promise<T> {
+  const headers: Record<string, string> = {};
+  const token = getToken();
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+
+  const form = new FormData();
+  form.append("file", file);
+  const qs = new URLSearchParams(query).toString();
+
+  const response = await fetch(
+    `${API_URL}/api/v1${path}${qs ? `?${qs}` : ""}`,
+    { method: "POST", headers, body: form },
+  );
+
+  if (response.status === 401) {
+    clearAuth();
+    if (typeof window !== "undefined") window.location.href = "/login";
+    throw new ApiError(401, "未登入");
+  }
+  if (!response.ok) {
+    let message = `上傳失敗 (${response.status})`;
+    try {
+      const data = await response.json();
+      if (data?.error) message = data.error;
+    } catch {
+      // keep default
+    }
+    throw new ApiError(response.status, message);
+  }
+  return (await response.json()) as T;
+}
+
+/** Downloads a binary file (e.g. an Excel template) and triggers a browser save. */
+export async function apiDownload(path: string, filename: string): Promise<void> {
+  const headers: Record<string, string> = {};
+  const token = getToken();
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+
+  const response = await fetch(`${API_URL}/api/v1${path}`, { headers });
+  if (!response.ok) {
+    throw new ApiError(response.status, `下載失敗 (${response.status})`);
+  }
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
 }

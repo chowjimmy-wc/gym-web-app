@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { api } from "@/lib/api";
-import type { MealDay, MealPlanDetail } from "@/lib/types";
+import type { MealDay, MealItem, MealPlanDetail } from "@/lib/types";
 import { Button, Card, ErrorMessage, Input, PageTitle, Spinner, Textarea } from "@/components/ui";
 
 interface MealDraft {
@@ -35,6 +35,7 @@ export default function MealPlanDetailPage() {
   const planId = params.id;
 
   const [plan, setPlan] = useState<MealPlanDetail | null>(null);
+  const [mealItems, setMealItems] = useState<MealItem[]>([]);
   const [selectedDay, setSelectedDay] = useState(1);
   const [draft, setDraft] = useState<MealDraft>(toDraft(null));
   const [error, setError] = useState<string | null>(null);
@@ -48,6 +49,10 @@ export default function MealPlanDetailPage() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    api<MealItem[]>("/meal-items").then(setMealItems).catch(() => {});
+  }, []);
 
   useEffect(() => {
     const dayParam = Number(searchParams.get("day"));
@@ -168,35 +173,40 @@ export default function MealPlanDetailPage() {
             onChange={(v) => setDraft({ ...draft, dayOfWeek: v })}
             placeholder="星期一"
           />
-          <Textarea
+          {mealItems.length > 0 && (
+            <p className="text-xs text-slate-500">
+              提示：每個餐別可從「菜式庫」加入菜式，或直接輸入其他內容。
+            </p>
+          )}
+          <DishField
             label="早餐"
             value={draft.breakfast}
             onChange={(v) => setDraft({ ...draft, breakfast: v })}
-            rows={2}
+            items={mealItems}
           />
-          <Textarea
+          <DishField
             label="午餐"
             value={draft.lunch}
             onChange={(v) => setDraft({ ...draft, lunch: v })}
-            rows={2}
+            items={mealItems}
           />
-          <Textarea
+          <DishField
             label="下午茶"
             value={draft.afternoonSnack}
             onChange={(v) => setDraft({ ...draft, afternoonSnack: v })}
-            rows={2}
+            items={mealItems}
           />
-          <Textarea
+          <DishField
             label="晚餐"
             value={draft.dinner}
             onChange={(v) => setDraft({ ...draft, dinner: v })}
-            rows={2}
+            items={mealItems}
           />
-          <Textarea
+          <DishField
             label="訓練後/睡前補充"
             value={draft.supplements}
             onChange={(v) => setDraft({ ...draft, supplements: v })}
-            rows={2}
+            items={mealItems}
           />
           <Textarea
             label="備餐提示與技巧"
@@ -215,5 +225,53 @@ export default function MealPlanDetailPage() {
         )}
       </Card>
     </div>
+  );
+}
+
+function DishField({
+  label,
+  value,
+  onChange,
+  items,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  items: MealItem[];
+}) {
+  function addDish(name: string) {
+    if (!name) return;
+    onChange(value.trim() ? `${value}\n${name}` : name);
+  }
+
+  return (
+    <label className="block">
+      <div className="mb-1 flex items-center justify-between gap-2">
+        <span className="text-xs font-medium text-slate-400">{label}</span>
+        {items.length > 0 && (
+          <select
+            value=""
+            onChange={(e) => {
+              addDish(e.target.value);
+              e.target.value = "";
+            }}
+            className="rounded-lg border border-slate-600 bg-slate-900/70 px-2 py-1 text-xs text-slate-200 focus:border-emerald-400 focus:outline-none"
+          >
+            <option value="">+ 加入菜式</option>
+            {items.map((it) => (
+              <option key={it.id} value={it.name}>
+                {it.name}
+              </option>
+            ))}
+          </select>
+        )}
+      </div>
+      <textarea
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        rows={2}
+        className="w-full rounded-lg border border-slate-600 bg-slate-900/70 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:border-emerald-400 focus:outline-none"
+      />
+    </label>
   );
 }

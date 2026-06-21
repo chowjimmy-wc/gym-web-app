@@ -10,6 +10,10 @@ public final class ProgressDtos {
 
     public record DayLogRequest(Boolean completed, String workoutNotes) {}
 
+    public record ExerciseLogRequest(Boolean completed) {}
+
+    public record ExerciseLogDto(Long exerciseId, boolean completed, java.time.Instant completedAt) {}
+
     public record DayLogDto(
             Long id, int dayNumber, boolean completed, Instant completedAt, String workoutNotes) {}
 
@@ -30,6 +34,11 @@ public final class ProgressDtos {
             String strengthProgress,
             String moodSleepSoreness,
             String reflection) {}
+
+    static ExerciseLogDto toDto(ExerciseLog log) {
+        return new ExerciseLogDto(
+                log.getExercise().getId(), log.isCompleted(), log.getCompletedAt());
+    }
 
     static DayLogDto toDto(DayLog log) {
         return new DayLogDto(

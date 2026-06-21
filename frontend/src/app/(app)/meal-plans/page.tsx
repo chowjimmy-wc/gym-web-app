@@ -5,6 +5,7 @@ import Link from "next/link";
 import { api } from "@/lib/api";
 import type { MealPlanSummary, Templates } from "@/lib/types";
 import { Button, Card, ErrorMessage, Input, PageTitle, Spinner, Textarea } from "@/components/ui";
+import { ExcelActions } from "@/components/ExcelActions";
 
 export default function MealPlansPage() {
   const [plans, setPlans] = useState<MealPlanSummary[] | null>(null);
@@ -65,19 +66,44 @@ export default function MealPlansPage() {
     await load();
   }
 
+  async function activate(id: number) {
+    setBusy(true);
+    try {
+      await api(`/meal-plans/${id}/activate`, { method: "POST" });
+      await load();
+    } finally {
+      setBusy(false);
+    }
+  }
+
   if (!plans) return <Spinner />;
 
   return (
     <div className="space-y-5">
       <PageTitle
         title="飲食餐單"
-        subtitle="建立與管理你的餐單"
+        subtitle="建立與管理你的餐單。設定「使用中」的餐單會顯示在今日總覽。"
         actions={
           <Button onClick={() => setShowForm(!showForm)}>
             {showForm ? "取消" : "+ 新增餐單"}
           </Button>
         }
       />
+
+      <Card>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="text-sm text-slate-400">
+            使用 Excel 批次匯入餐單，或先下載範本填寫。
+          </div>
+          <ExcelActions
+            templatePath="/meal-plans/template/excel"
+            templateFilename="gymapp-meal-plan-template.xlsx"
+            importPath="/meal-plans/import/excel"
+            defaultName="我的餐單"
+            onImported={load}
+          />
+        </div>
+      </Card>
 
       {showForm && (
         <Card>
@@ -101,13 +127,30 @@ export default function MealPlansPage() {
 
       <div className="grid gap-4 md:grid-cols-2">
         {plans.map((p) => (
-          <Card key={p.id} className="flex flex-col justify-between gap-3">
+          <Card
+            key={p.id}
+            className={`flex flex-col justify-between gap-3 ${
+              p.active ? "ring-1 ring-emerald-400/60" : ""
+            }`}
+          >
             <div>
-              <h2 className="text-lg font-semibold text-slate-100">{p.name}</h2>
+              <div className="flex items-start justify-between gap-2">
+                <h2 className="text-lg font-semibold text-slate-100">{p.name}</h2>
+                {p.active && (
+                  <span className="shrink-0 rounded-full bg-emerald-500 px-2.5 py-0.5 text-xs font-semibold text-slate-950">
+                    使用中
+                  </span>
+                )}
+              </div>
               {p.description && <p className="mt-1 text-sm text-slate-400">{p.description}</p>}
               <p className="mt-2 text-xs text-slate-500">{p.durationDays} 天</p>
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
+              {!p.active && (
+                <Button onClick={() => activate(p.id)} disabled={busy}>
+                  設為使用中
+                </Button>
+              )}
               <Link href={`/meal-plans/${p.id}`} className="flex-1">
                 <Button variant="secondary" className="w-full">
                   查看 / 編輯

@@ -8,6 +8,10 @@ public interface WorkoutProgramRepository extends JpaRepository<WorkoutProgram, 
 
     List<WorkoutProgram> findByUserIdOrderByCreatedAtDesc(Long userId);
 
+    List<WorkoutProgram> findByUserIdAndActiveTrue(Long userId);
+
+    boolean existsByUserIdAndActiveTrue(Long userId);
+
     List<WorkoutProgram> findByTemplateTrue();
 
     Optional<WorkoutProgram> findByIdAndTemplateTrue(Long id);

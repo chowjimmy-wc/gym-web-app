@@ -41,6 +41,9 @@ public class MealPlan {
     @Column(name = "is_template", nullable = false)
     private boolean template;
 
+    @Column(nullable = false)
+    private boolean active;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt = Instant.now();
 }

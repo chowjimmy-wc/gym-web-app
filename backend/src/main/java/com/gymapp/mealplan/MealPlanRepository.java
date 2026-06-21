@@ -8,6 +8,10 @@ public interface MealPlanRepository extends JpaRepository<MealPlan, Long> {
 
     List<MealPlan> findByUserIdOrderByCreatedAtDesc(Long userId);
 
+    List<MealPlan> findByUserIdAndActiveTrue(Long userId);
+
+    boolean existsByUserIdAndActiveTrue(Long userId);
+
     List<MealPlan> findByTemplateTrue();
 
     Optional<MealPlan> findByIdAndTemplateTrue(Long id);

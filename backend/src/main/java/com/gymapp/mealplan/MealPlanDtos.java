@@ -35,7 +35,12 @@ public final class MealPlanDtos {
             String tips) {}
 
     public record MealPlanSummaryDto(
-            Long id, String name, String description, int durationDays, boolean template) {}
+            Long id,
+            String name,
+            String description,
+            int durationDays,
+            boolean template,
+            boolean active) {}
 
     public record MealPlanDetailDto(
             Long id,
@@ -43,6 +48,7 @@ public final class MealPlanDtos {
             String description,
             int durationDays,
             boolean template,
+            boolean active,
             List<MealDayDto> days) {}
 
     static MealDayDto toDto(MealDay d) {
@@ -61,7 +67,12 @@ public final class MealPlanDtos {
 
     static MealPlanSummaryDto toSummaryDto(MealPlan p) {
         return new MealPlanSummaryDto(
-                p.getId(), p.getName(), p.getDescription(), p.getDurationDays(), p.isTemplate());
+                p.getId(),
+                p.getName(),
+                p.getDescription(),
+                p.getDurationDays(),
+                p.isTemplate(),
+                p.isActive());
     }
 
     static MealPlanDetailDto toDetailDto(MealPlan p, List<MealDay> days) {
@@ -71,6 +82,7 @@ public final class MealPlanDtos {
                 p.getDescription(),
                 p.getDurationDays(),
                 p.isTemplate(),
+                p.isActive(),
                 days.stream().map(MealPlanDtos::toDto).toList());
     }
 }

@@ -49,7 +49,8 @@ public final class ProgramDtos {
             int durationDays,
             LocalDate startDate,
             WorkoutProgram.Status status,
-            boolean template) {}
+            boolean template,
+            boolean active) {}
 
     public record ProgramDetailDto(
             Long id,
@@ -59,6 +60,7 @@ public final class ProgramDtos {
             LocalDate startDate,
             WorkoutProgram.Status status,
             boolean template,
+            boolean active,
             List<DayDto> days) {}
 
     static ExerciseDto toDto(WorkoutExercise e) {
@@ -86,7 +88,8 @@ public final class ProgramDtos {
                 p.getDurationDays(),
                 p.getStartDate(),
                 p.getStatus(),
-                p.isTemplate());
+                p.isTemplate(),
+                p.isActive());
     }
 
     static ProgramDetailDto toDetailDto(WorkoutProgram p, List<WorkoutDay> days) {
@@ -98,6 +101,7 @@ public final class ProgramDtos {
                 p.getStartDate(),
                 p.getStatus(),
                 p.isTemplate(),
+                p.isActive(),
                 days.stream().map(ProgramDtos::toDto).toList());
     }
 }

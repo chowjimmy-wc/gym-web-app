@@ -5,6 +5,7 @@ import Link from "next/link";
 import { api } from "@/lib/api";
 import type {
   DayLog,
+  ExerciseLog,
   MealDay,
   MealPlanDetail,
   MealPlanSummary,
@@ -32,6 +33,7 @@ export default function DashboardPage() {
   const [program, setProgram] = useState<ProgramDetail | null>(null);
   const [mealPlan, setMealPlan] = useState<MealPlanDetail | null>(null);
   const [logs, setLogs] = useState<DayLog[]>([]);
+  const [exerciseLogs, setExerciseLogs] = useState<ExerciseLog[]>([]);
   const [day, setDay] = useState(1);
   const [templates, setTemplates] = useState<Templates | null>(null);
   const [busy, setBusy] = useState(false);
@@ -40,23 +42,25 @@ export default function DashboardPage() {
     setLoading(true);
     try {
       const programs = await api<ProgramSummary[]>("/programs");
-      const chosen =
-        programs.find((p) => p.status === "ACTIVE") ?? programs[0] ?? null;
+      const chosen = programs.find((p) => p.active) ?? programs[0] ?? null;
       if (!chosen) {
         setProgram(null);
         setTemplates(await api<Templates>("/templates"));
         return;
       }
-      const [detail, dayLogs, mealPlans] = await Promise.all([
+      const [detail, dayLogs, exLogs, mealPlans] = await Promise.all([
         api<ProgramDetail>(`/programs/${chosen.id}`),
         api<DayLog[]>(`/programs/${chosen.id}/day-logs`),
+        api<ExerciseLog[]>(`/programs/${chosen.id}/exercise-logs`),
         api<MealPlanSummary[]>("/meal-plans"),
       ]);
       setProgram(detail);
       setLogs(dayLogs);
+      setExerciseLogs(exLogs);
       setDay(computeCurrentDay(detail, dayLogs));
-      if (mealPlans.length > 0) {
-        setMealPlan(await api<MealPlanDetail>(`/meal-plans/${mealPlans[0].id}`));
+      const activeMeal = mealPlans.find((m) => m.active) ?? mealPlans[0];
+      if (activeMeal) {
+        setMealPlan(await api<MealPlanDetail>(`/meal-plans/${activeMeal.id}`));
       }
     } finally {
       setLoading(false);
@@ -89,6 +93,24 @@ export default function DashboardPage() {
       setLogs(await api<DayLog[]>(`/programs/${program.id}/day-logs`));
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function toggleExercise(exerciseId: number, completed: boolean) {
+    if (!program) return;
+    // Optimistic update for snappy checkbox feedback
+    setExerciseLogs((prev) => {
+      const others = prev.filter((l) => l.exerciseId !== exerciseId);
+      return [...others, { exerciseId, completed, completedAt: null }];
+    });
+    try {
+      await api(`/programs/${program.id}/exercise-logs/${exerciseId}`, {
+        method: "PUT",
+        body: { completed },
+      });
+      setExerciseLogs(await api<ExerciseLog[]>(`/programs/${program.id}/exercise-logs`));
+    } catch {
+      setExerciseLogs(await api<ExerciseLog[]>(`/programs/${program.id}/exercise-logs`));
     }
   }
 
@@ -191,17 +213,33 @@ export default function DashboardPage() {
                 <p className="text-slate-400">休息：{workoutDay.restAdvice}</p>
               )}
               <ul className="space-y-2">
-                {workoutDay.exercises.map((ex) => (
-                  <li
-                    key={ex.id}
-                    className="flex items-center justify-between rounded-lg bg-slate-900/60 px-3 py-2"
-                  >
-                    <span className="text-slate-200">{ex.name}</span>
-                    {ex.setsReps && (
-                      <span className="font-mono text-xs text-emerald-400">{ex.setsReps}</span>
-                    )}
-                  </li>
-                ))}
+                {workoutDay.exercises.map((ex) => {
+                  const done =
+                    exerciseLogs.find((l) => l.exerciseId === ex.id)?.completed ?? false;
+                  return (
+                    <li
+                      key={ex.id}
+                      className="flex items-center gap-3 rounded-lg bg-slate-900/60 px-3 py-2"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={done}
+                        onChange={(e) => toggleExercise(ex.id, e.target.checked)}
+                        className="h-4 w-4 shrink-0 accent-emerald-500"
+                      />
+                      <span
+                        className={`flex-1 ${
+                          done ? "text-slate-500 line-through" : "text-slate-200"
+                        }`}
+                      >
+                        {ex.name}
+                      </span>
+                      {ex.setsReps && (
+                        <span className="font-mono text-xs text-emerald-400">{ex.setsReps}</span>
+                      )}
+                    </li>
+                  );
+                })}
               </ul>
               {workoutDay.notes && <p className="text-slate-400">備註：{workoutDay.notes}</p>}
               {log?.workoutNotes && (

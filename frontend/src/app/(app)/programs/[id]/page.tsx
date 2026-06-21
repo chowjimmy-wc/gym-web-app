@@ -3,7 +3,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { api } from "@/lib/api";
-import type { DayLog, ProgramDetail, ProgramStatus, WorkoutDay } from "@/lib/types";
+import type {
+  DayLog,
+  ProgramDetail,
+  ProgramStatus,
+  WorkoutActivity,
+  WorkoutDay,
+} from "@/lib/types";
 import {
   Button,
   Card,
@@ -48,6 +54,7 @@ export default function ProgramDetailPage() {
 
   const [program, setProgram] = useState<ProgramDetail | null>(null);
   const [logs, setLogs] = useState<DayLog[]>([]);
+  const [activities, setActivities] = useState<WorkoutActivity[]>([]);
   const [selectedDay, setSelectedDay] = useState(1);
   const [draft, setDraft] = useState<DayDraft>(toDraft(null));
   const [meta, setMeta] = useState({ name: "", description: "", startDate: "", status: "DRAFT" as ProgramStatus });
@@ -72,6 +79,10 @@ export default function ProgramDetailPage() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    api<WorkoutActivity[]>("/workout-activities").then(setActivities).catch(() => {});
+  }, []);
 
   useEffect(() => {
     const dayParam = Number(searchParams.get("day"));
@@ -296,11 +307,29 @@ export default function ProgramDetailPage() {
         </div>
 
         <h3 className="mb-2 mt-5 text-sm font-semibold text-slate-200">動作列表</h3>
+        {activities.length > 0 && (
+          <p className="mb-2 text-xs text-slate-500">
+            提示：在動作名稱欄可從你的「動作庫」選擇，或直接輸入其他動作。
+          </p>
+        )}
+        <datalist id="activity-options">
+          {activities.map((a) => (
+            <option key={a.id} value={a.name}>
+              {a.category ? `${a.category}` : ""}
+            </option>
+          ))}
+        </datalist>
         <div className="space-y-2">
           {draft.exercises.map((ex, i) => (
             <div key={i} className="flex gap-2">
               <div className="flex-1">
-                <Input value={ex.name} onChange={(v) => updateExercise(i, "name", v)} placeholder="動作名稱" />
+                <input
+                  list="activity-options"
+                  value={ex.name}
+                  onChange={(e) => updateExercise(i, "name", e.target.value)}
+                  placeholder="動作名稱（從動作庫選擇或自行輸入）"
+                  className="w-full rounded-lg border border-slate-600 bg-slate-900/70 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:border-emerald-400 focus:outline-none"
+                />
               </div>
               <div className="w-36">
                 <Input

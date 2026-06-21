@@ -1,5 +1,6 @@
 package com.gymapp.program;
 
+import com.gymapp.common.ApiException;
 import com.gymapp.program.ProgramDtos.DayDto;
 import com.gymapp.program.ProgramDtos.DayRequest;
 import com.gymapp.program.ProgramDtos.ProgramDetailDto;
@@ -7,9 +8,13 @@ import com.gymapp.program.ProgramDtos.ProgramRequest;
 import com.gymapp.program.ProgramDtos.ProgramSummaryDto;
 import com.gymapp.user.User;
 import jakarta.validation.Valid;
+import java.io.IOException;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -18,8 +23,10 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequestMapping("/api/v1/programs")
@@ -45,6 +52,38 @@ public class ProgramController {
     public ProgramDetailDto cloneTemplate(
             @AuthenticationPrincipal User user, @PathVariable Long templateId) {
         return programService.cloneTemplate(user, templateId);
+    }
+
+    @PostMapping("/{id}/activate")
+    public ProgramSummaryDto activate(@AuthenticationPrincipal User user, @PathVariable Long id) {
+        return programService.activate(user, id);
+    }
+
+    @GetMapping("/template/excel")
+    public ResponseEntity<byte[]> downloadTemplate() {
+        return ResponseEntity.ok()
+                .header(
+                        HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=\"gymapp-workout-template.xlsx\"")
+                .contentType(MediaType.parseMediaType(
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .body(programService.excelTemplate());
+    }
+
+    @PostMapping("/import/excel")
+    @ResponseStatus(HttpStatus.CREATED)
+    public ProgramDetailDto importExcel(
+            @AuthenticationPrincipal User user,
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(value = "name", required = false) String name) {
+        if (file.isEmpty()) {
+            throw ApiException.badRequest("請選擇要匯入的 Excel 檔案");
+        }
+        try {
+            return programService.importFromExcel(user, name, file.getBytes());
+        } catch (IOException e) {
+            throw ApiException.badRequest("讀取檔案失敗：" + e.getMessage());
+        }
     }
 
     @GetMapping("/{id}")

@@ -1,11 +1,14 @@
 package com.gymapp.program;
 
 import com.gymapp.common.ApiException;
+import com.gymapp.excel.ExcelService;
+import com.gymapp.excel.ExcelService.ParsedWorkoutDay;
 import com.gymapp.program.ProgramDtos.DayRequest;
 import com.gymapp.program.ProgramDtos.ProgramDetailDto;
 import com.gymapp.program.ProgramDtos.ProgramRequest;
 import com.gymapp.program.ProgramDtos.ProgramSummaryDto;
 import com.gymapp.user.User;
+import java.time.LocalDate;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -17,6 +20,7 @@ public class ProgramService {
 
     private final WorkoutProgramRepository programRepository;
     private final WorkoutDayRepository dayRepository;
+    private final ExcelService excelService;
 
     public List<ProgramSummaryDto> listForUser(User user) {
         return programRepository.findByUserIdOrderByCreatedAtDesc(user.getId()).stream()
@@ -42,6 +46,26 @@ public class ProgramService {
         WorkoutProgram program = new WorkoutProgram();
         program.setUser(user);
         apply(program, request);
+        // First program a user owns becomes the active one automatically
+        if (!programRepository.existsByUserIdAndActiveTrue(user.getId())) {
+            program.setActive(true);
+        }
+        return ProgramDtos.toSummaryDto(programRepository.save(program));
+    }
+
+    @Transactional
+    public ProgramSummaryDto activate(User user, Long id) {
+        WorkoutProgram program = findOwned(user, id);
+        // Clear the currently active program(s) for this user, flush, then activate this one.
+        // The flush guarantees the unique partial index sees the clears before the new active.
+        programRepository.findByUserIdAndActiveTrue(user.getId()).forEach(p -> {
+            if (!p.getId().equals(program.getId())) {
+                p.setActive(false);
+                programRepository.save(p);
+            }
+        });
+        programRepository.flush();
+        program.setActive(true);
         return ProgramDtos.toSummaryDto(programRepository.save(program));
     }
 
@@ -54,7 +78,19 @@ public class ProgramService {
 
     @Transactional
     public void delete(User user, Long id) {
-        programRepository.delete(findOwned(user, id));
+        WorkoutProgram program = findOwned(user, id);
+        boolean wasActive = program.isActive();
+        programRepository.delete(program);
+        programRepository.flush();
+        // Promote the most recent remaining program to active
+        if (wasActive) {
+            programRepository.findByUserIdOrderByCreatedAtDesc(user.getId()).stream()
+                    .findFirst()
+                    .ifPresent(p -> {
+                        p.setActive(true);
+                        programRepository.save(p);
+                    });
+        }
     }
 
     @Transactional
@@ -69,6 +105,9 @@ public class ProgramService {
         copy.setDurationDays(template.getDurationDays());
         copy.setStatus(WorkoutProgram.Status.DRAFT);
         copy.setTemplate(false);
+        if (!programRepository.existsByUserIdAndActiveTrue(user.getId())) {
+            copy.setActive(true);
+        }
         copy = programRepository.save(copy);
 
         for (WorkoutDay day : dayRepository.findByProgramIdOrderByDayNumberAsc(templateId)) {
@@ -93,6 +132,53 @@ public class ProgramService {
         }
         return ProgramDtos.toDetailDto(
                 copy, dayRepository.findByProgramIdOrderByDayNumberAsc(copy.getId()));
+    }
+
+    public byte[] excelTemplate() {
+        return excelService.workoutTemplate();
+    }
+
+    @Transactional
+    public ProgramDetailDto importFromExcel(User user, String name, byte[] bytes) {
+        List<ParsedWorkoutDay> parsed = excelService.parseWorkout(bytes);
+        int maxDay = parsed.stream().mapToInt(ParsedWorkoutDay::dayNumber).max().orElse(0);
+
+        WorkoutProgram program = new WorkoutProgram();
+        program.setUser(user);
+        program.setName(name != null && !name.isBlank()
+                ? name.strip()
+                : "匯入的訓練計劃 " + LocalDate.now());
+        program.setDurationDays(Math.max(maxDay, 1));
+        program.setStatus(WorkoutProgram.Status.DRAFT);
+        program.setTemplate(false);
+        if (!programRepository.existsByUserIdAndActiveTrue(user.getId())) {
+            program.setActive(true);
+        }
+        WorkoutProgram saved = programRepository.save(program);
+
+        for (ParsedWorkoutDay pd : parsed) {
+            WorkoutDay day = new WorkoutDay();
+            day.setProgram(saved);
+            day.setDayNumber(pd.dayNumber());
+            day.setWeekNumber(pd.weekNumber());
+            day.setDayOfWeek(pd.dayOfWeek());
+            day.setTrainingType(pd.trainingType());
+            day.setRestAdvice(pd.restAdvice());
+            day.setCardio(pd.cardio());
+            day.setNotes(pd.notes());
+            int order = 0;
+            for (var ex : pd.exercises()) {
+                WorkoutExercise exercise = new WorkoutExercise();
+                exercise.setDay(day);
+                exercise.setSortOrder(order++);
+                exercise.setName(ex.name());
+                exercise.setSetsReps(ex.setsReps());
+                day.getExercises().add(exercise);
+            }
+            dayRepository.save(day);
+        }
+        return ProgramDtos.toDetailDto(
+                saved, dayRepository.findByProgramIdOrderByDayNumberAsc(saved.getId()));
     }
 
     @Transactional

@@ -1,12 +1,15 @@
 package com.gymapp.mealplan;
 
 import com.gymapp.common.ApiException;
+import com.gymapp.excel.ExcelService;
+import com.gymapp.excel.ExcelService.ParsedMealDay;
 import com.gymapp.mealplan.MealPlanDtos.MealDayDto;
 import com.gymapp.mealplan.MealPlanDtos.MealDayRequest;
 import com.gymapp.mealplan.MealPlanDtos.MealPlanDetailDto;
 import com.gymapp.mealplan.MealPlanDtos.MealPlanRequest;
 import com.gymapp.mealplan.MealPlanDtos.MealPlanSummaryDto;
 import com.gymapp.user.User;
+import java.time.LocalDate;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -18,6 +21,7 @@ public class MealPlanService {
 
     private final MealPlanRepository mealPlanRepository;
     private final MealDayRepository mealDayRepository;
+    private final ExcelService excelService;
 
     public List<MealPlanSummaryDto> listForUser(User user) {
         return mealPlanRepository.findByUserIdOrderByCreatedAtDesc(user.getId()).stream()
@@ -43,6 +47,23 @@ public class MealPlanService {
         MealPlan plan = new MealPlan();
         plan.setUser(user);
         apply(plan, request);
+        if (!mealPlanRepository.existsByUserIdAndActiveTrue(user.getId())) {
+            plan.setActive(true);
+        }
+        return MealPlanDtos.toSummaryDto(mealPlanRepository.save(plan));
+    }
+
+    @Transactional
+    public MealPlanSummaryDto activate(User user, Long id) {
+        MealPlan plan = findOwned(user, id);
+        mealPlanRepository.findByUserIdAndActiveTrue(user.getId()).forEach(p -> {
+            if (!p.getId().equals(plan.getId())) {
+                p.setActive(false);
+                mealPlanRepository.save(p);
+            }
+        });
+        mealPlanRepository.flush();
+        plan.setActive(true);
         return MealPlanDtos.toSummaryDto(mealPlanRepository.save(plan));
     }
 
@@ -55,7 +76,18 @@ public class MealPlanService {
 
     @Transactional
     public void delete(User user, Long id) {
-        mealPlanRepository.delete(findOwned(user, id));
+        MealPlan plan = findOwned(user, id);
+        boolean wasActive = plan.isActive();
+        mealPlanRepository.delete(plan);
+        mealPlanRepository.flush();
+        if (wasActive) {
+            mealPlanRepository.findByUserIdOrderByCreatedAtDesc(user.getId()).stream()
+                    .findFirst()
+                    .ifPresent(p -> {
+                        p.setActive(true);
+                        mealPlanRepository.save(p);
+                    });
+        }
     }
 
     @Transactional
@@ -69,6 +101,9 @@ public class MealPlanService {
         copy.setDescription(template.getDescription());
         copy.setDurationDays(template.getDurationDays());
         copy.setTemplate(false);
+        if (!mealPlanRepository.existsByUserIdAndActiveTrue(user.getId())) {
+            copy.setActive(true);
+        }
         copy = mealPlanRepository.save(copy);
 
         for (MealDay day : mealDayRepository.findByMealPlanIdOrderByDayNumberAsc(templateId)) {
@@ -87,6 +122,45 @@ public class MealPlanService {
         }
         return MealPlanDtos.toDetailDto(
                 copy, mealDayRepository.findByMealPlanIdOrderByDayNumberAsc(copy.getId()));
+    }
+
+    public byte[] excelTemplate() {
+        return excelService.mealTemplate();
+    }
+
+    @Transactional
+    public MealPlanDetailDto importFromExcel(User user, String name, byte[] bytes) {
+        List<ParsedMealDay> parsed = excelService.parseMeals(bytes);
+        int maxDay = parsed.stream().mapToInt(ParsedMealDay::dayNumber).max().orElse(0);
+
+        MealPlan plan = new MealPlan();
+        plan.setUser(user);
+        plan.setName(name != null && !name.isBlank()
+                ? name.strip()
+                : "匯入的餐單 " + LocalDate.now());
+        plan.setDurationDays(Math.max(maxDay, 1));
+        plan.setTemplate(false);
+        if (!mealPlanRepository.existsByUserIdAndActiveTrue(user.getId())) {
+            plan.setActive(true);
+        }
+        MealPlan saved = mealPlanRepository.save(plan);
+
+        for (ParsedMealDay pd : parsed) {
+            MealDay day = new MealDay();
+            day.setMealPlan(saved);
+            day.setDayNumber(pd.dayNumber());
+            day.setWeekNumber(pd.weekNumber());
+            day.setDayOfWeek(pd.dayOfWeek());
+            day.setBreakfast(pd.breakfast());
+            day.setLunch(pd.lunch());
+            day.setAfternoonSnack(pd.afternoonSnack());
+            day.setDinner(pd.dinner());
+            day.setSupplements(pd.supplements());
+            day.setTips(pd.tips());
+            mealDayRepository.save(day);
+        }
+        return MealPlanDtos.toDetailDto(
+                saved, mealDayRepository.findByMealPlanIdOrderByDayNumberAsc(saved.getId()));
     }
 
     @Transactional

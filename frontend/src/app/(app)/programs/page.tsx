@@ -5,6 +5,7 @@ import Link from "next/link";
 import { api } from "@/lib/api";
 import type { ProgramSummary, Templates } from "@/lib/types";
 import { Button, Card, ErrorMessage, Input, PageTitle, Spinner, Textarea } from "@/components/ui";
+import { ExcelActions } from "@/components/ExcelActions";
 
 const STATUS_LABEL: Record<string, string> = {
   DRAFT: "草稿",
@@ -71,19 +72,44 @@ export default function ProgramsPage() {
     await load();
   }
 
+  async function activate(id: number) {
+    setBusy(true);
+    try {
+      await api(`/programs/${id}/activate`, { method: "POST" });
+      await load();
+    } finally {
+      setBusy(false);
+    }
+  }
+
   if (!programs) return <Spinner />;
 
   return (
     <div className="space-y-5">
       <PageTitle
         title="訓練計劃"
-        subtitle="建立與管理你的訓練計劃"
+        subtitle="建立與管理你的訓練計劃。設定「使用中」的計劃會顯示在今日總覽。"
         actions={
           <Button onClick={() => setShowForm(!showForm)}>
             {showForm ? "取消" : "+ 新增計劃"}
           </Button>
         }
       />
+
+      <Card>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="text-sm text-slate-400">
+            使用 Excel 批次匯入訓練計劃，或先下載範本填寫。
+          </div>
+          <ExcelActions
+            templatePath="/programs/template/excel"
+            templateFilename="gymapp-workout-template.xlsx"
+            importPath="/programs/import/excel"
+            defaultName="我的訓練計劃"
+            onImported={load}
+          />
+        </div>
+      </Card>
 
       {showForm && (
         <Card>
@@ -107,21 +133,33 @@ export default function ProgramsPage() {
 
       <div className="grid gap-4 md:grid-cols-2">
         {programs.map((p) => (
-          <Card key={p.id} className="flex flex-col justify-between gap-3">
+          <Card
+            key={p.id}
+            className={`flex flex-col justify-between gap-3 ${
+              p.active ? "ring-1 ring-emerald-400/60" : ""
+            }`}
+          >
             <div>
               <div className="flex items-start justify-between gap-2">
                 <h2 className="text-lg font-semibold text-slate-100">{p.name}</h2>
-                <span
-                  className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                    p.status === "ACTIVE"
-                      ? "bg-emerald-500/15 text-emerald-300"
-                      : p.status === "COMPLETED"
-                        ? "bg-sky-500/15 text-sky-300"
-                        : "bg-slate-600/30 text-slate-300"
-                  }`}
-                >
-                  {STATUS_LABEL[p.status]}
-                </span>
+                <div className="flex shrink-0 gap-1.5">
+                  {p.active && (
+                    <span className="rounded-full bg-emerald-500 px-2.5 py-0.5 text-xs font-semibold text-slate-950">
+                      使用中
+                    </span>
+                  )}
+                  <span
+                    className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                      p.status === "ACTIVE"
+                        ? "bg-emerald-500/15 text-emerald-300"
+                        : p.status === "COMPLETED"
+                          ? "bg-sky-500/15 text-sky-300"
+                          : "bg-slate-600/30 text-slate-300"
+                    }`}
+                  >
+                    {STATUS_LABEL[p.status]}
+                  </span>
+                </div>
               </div>
               {p.description && (
                 <p className="mt-1 text-sm text-slate-400">{p.description}</p>
@@ -130,7 +168,12 @@ export default function ProgramsPage() {
                 {p.durationDays} 天{p.startDate ? ` ・ 開始日期 ${p.startDate}` : ""}
               </p>
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
+              {!p.active && (
+                <Button onClick={() => activate(p.id)} disabled={busy}>
+                  設為使用中
+                </Button>
+              )}
               <Link href={`/programs/${p.id}`} className="flex-1">
                 <Button variant="secondary" className="w-full">
                   查看 / 編輯

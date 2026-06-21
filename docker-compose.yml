@@ -18,6 +18,7 @@ services:
     build: ./backend
     restart: unless-stopped
     environment:
+      SERVER_PORT: 8080
       DB_URL: jdbc:postgresql://db:5432/gymapp
       DB_USERNAME: gymapp
       DB_PASSWORD: ${DB_PASSWORD:-gymapp}

@@ -27,6 +27,7 @@ export interface ProgramSummary {
   startDate: string | null;
   status: ProgramStatus;
   template: boolean;
+  active: boolean;
 }
 
 export interface Exercise {
@@ -58,6 +59,7 @@ export interface MealPlanSummary {
   description: string | null;
   durationDays: number;
   template: boolean;
+  active: boolean;
 }
 
 export interface MealDay {
@@ -99,4 +101,23 @@ export interface WeeklyReview {
 export interface Templates {
   programs: ProgramSummary[];
   mealPlans: MealPlanSummary[];
+}
+
+export interface WorkoutActivity {
+  id: number;
+  category: string | null;
+  name: string;
+  notes: string | null;
+}
+
+export interface MealItem {
+  id: number;
+  name: string;
+  cookingMethod: string | null;
+}
+
+export interface ExerciseLog {
+  exerciseId: number;
+  completed: boolean;
+  completedAt: string | null;
 }

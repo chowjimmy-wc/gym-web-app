@@ -10,6 +10,8 @@ const NAV_ITEMS = [
   { href: "/", label: "今日總覽" },
   { href: "/programs", label: "訓練計劃" },
   { href: "/meal-plans", label: "飲食餐單" },
+  { href: "/activities", label: "動作庫" },
+  { href: "/meal-items", label: "菜式庫" },
   { href: "/nutrition", label: "營養目標" },
   { href: "/progress", label: "進度追蹤" },
 ];
